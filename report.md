@@ -1,16 +1,16 @@
 # OEC-forest and Rival-tree technical report
 
-This report accompanies *The Family of Balanced T-MSTs for Incremental Minimum Spanning Trees*. The [OEC-forest analysis](#sec-oec) follows Section 6 of the paper and covers the exact depth law and its extensions to priority-based stitch and weighted DSU. The [Rival-tree analysis](#sec-hb) follows Section 5 and covers the balance rule, both link procedures, and the worst-case stitch construction. Algorithm, theorem, and lemma numbers are local to each analysis.
+The [OEC-forest analysis](#sec-oec) covers the exact depth law and its extensions to priority-based stitch and [not_amir’s weighted DSU][weighted-dsu-post]. The [Rival-tree analysis](#sec-hb) covers the balance rule, both link procedures, and the worst-case stitch construction. Numbered items in the Rival-tree analysis use the prefix R.
 
 ## Preliminaries
 
-Following Section 2 of the paper, let $G_t$ be the undirected graph on $n$ vertices after the first $t$ insertions, with real edge weights. For distinct vertices $u,v$ in the same component, the *path-max value* is
+Let $G_t$ be the undirected graph on $n$ vertices after the first $t$ insertions, with real edge weights. For distinct vertices $u,v$ in the same component, the *path-max value* is
 
 ```math
 \mathrm{PM}_{G_t}(u,v)=\min_{P:u\leadsto v}\ \max_{e\in P} w(e).
 ```
 
-We set $\mathrm{PM}_{G_t}(u,v)=+\infty$ for vertices in different components and $\mathrm{PM}_{G_t}(u,u)=-\infty$ for the empty path. The C++ method `PathMax` returns `std::nullopt` in both cases.
+We set $`\mathrm{PM}_{G_t}(u,v)=+\infty`$ for vertices in different components and $`\mathrm{PM}_{G_t}(u,u)=-\infty`$ for the empty path. The C++ method `PathMax` returns `std::nullopt` in both cases.
 
 The maintained forest $T_t$ stores a parent $p(v)$ and the weight $\mathit{wt}(v)$ of the parent edge. At a root, $p(v)=\bot$ (`null` in the pseudocode) and $\mathit{wt}(v)=+\infty$. The C++ implementations require input weights strictly below `std::numeric_limits<W>::max()`, which represents the root weight. Depth counts the edges from a vertex to its root, and height counts the edges on its longest downward path.
 
@@ -132,15 +132,13 @@ Now run [Algorithm 1](#alg-update) on $\sigma$, storing fields only for the vert
 
 <a name="eq-recursion"></a>
 
-Define random variables $D_0,D_1,D_2,\dots$ by
+Recurrence (1) defines the random variables $D_0,D_1,D_2,\dots$.
 
 ```math
-D_0 = 0,
-  \qquad
-  D_m \;\stackrel{d}{=}\; 1 + D_{J_m}\quad (m\ge 1),
-\tag{1}
+D_0 = 0, \qquad D_m \;\stackrel{d}{=}\; 1 + D_{J_m} \quad (m\ge 1).
 ```
-where $J_m$ is uniformly distributed on $`\{0,1,\dots,m-1\}`$ and independent of $D_0,\dots,D_{m-1}$. The number of records (left-to-right maxima) of a uniform permutation satisfies this recursion. The maximum is the final record, and the elements preceding it form a uniformly ordered prefix of length $J_m$. [Knuth, *The Art of Computer Programming*, Vol. 1, 3rd ed. (1997), Section 1.2.10](#ref-knuth1997taocp1)
+
+Here $J_m$ is uniformly distributed on $`\{0,1,\dots,m-1\}`$ and independent of $D_0,\dots,D_{m-1}$. The number of records (left-to-right maxima) of a uniform permutation satisfies this recursion. The maximum is the final record, and the elements preceding it form a uniformly ordered prefix of length $J_m$. [Knuth, *The Art of Computer Programming*, Vol. 1, 3rd ed. (1997), Section 1.2.10](#ref-knuth1997taocp1)
 
 Throughout, $B_1,B_2,\dots$ are independent Bernoulli random variables with $\mathbb{E}[B_i]=1/i$, so $B_1=1$.
 
@@ -359,13 +357,15 @@ where the last equality holds because $U$ is uniform on $`\{0,\dots,m-1\}`$. Hen
 
 <a name="sec-wdsu"></a>
 
+not_amir introduced the weighted DSU in 2024 for maintaining a minimum spanning forest under online edge insertions. The post gives a C++ implementation that links by random vertex index and an informal running-time argument. [Original Codeforces post][weighted-dsu-post]
+
 **Remark 1 (The weighted DSU).**
 
 <a name="rem-wdsu"></a>
 
-The weighted DSU attaches the endpoint with the smaller random index. We model the indices as the uniformly random order $\pi$. Both operations first test $u=v$, before either root walk. In that case an insertion ignores the self-loop and a query returns `std::nullopt`. For distinct endpoints and distinct edge weights, insertion uses the following three steps in addition to the priority rule. [not_amir (2024)](#ref-notamir2024wdsu)
+The weighted DSU attaches the endpoint with the smaller random index. We model the indices as the uniformly random order $\pi$. Both operations first test $u=v$, before either root walk. In that case an insertion ignores the self-loop and a query returns `std::nullopt`. For distinct endpoints and distinct edge weights, insertion uses the following three steps in addition to the priority rule.
 
-- **(a)** Walk from both insertion endpoints to their roots. If the roots differ, $\theta=\mathrm{PM}_{G_{t-1}}(u,v)=+\infty$ and the stitch starts directly on the two trees. If the roots agree, the shortcuts in (c) leave strictly increasing weights along both root paths. Advance the pointer with the lighter parent edge until the pointers are adjacent. Their connecting edge is the heaviest edge on the tree path, of weight $\theta=\mathrm{PM}_{G_{t-1}}(u,v)$. If $w>\theta$, discard the new edge. If $w<\theta$, cut the heaviest edge at its child $z^*$ by setting $p(z^*)\gets\bot$ and $\mathit{wt}(z^*)\gets+\infty$, then stitch the two resulting trees. In both connected cases the discarded edge is heaviest on the cycle created by the insertion.
+- **(a)** Walk from both insertion endpoints to their roots. If the roots differ, $`\theta=\mathrm{PM}_{G_{t-1}}(u,v)=+\infty`$ and the stitch starts directly on the two trees. If the roots agree, the shortcuts in (c) leave strictly increasing weights along both root paths. Advance the pointer with the lighter parent edge until the pointers are adjacent. Their connecting edge is the heaviest edge on the tree path, of weight $`\theta=\mathrm{PM}_{G_{t-1}}(u,v)`$. If $w>\theta$, discard the new edge. If $w<\theta$, cut the heaviest edge at its child $`z^*`$ by setting $`p(z^*)\gets\bot`$ and $`\mathit{wt}(z^*)\gets+\infty`$, then stitch the two resulting trees. In both connected cases the discarded edge is heaviest on the cycle created by the insertion.
 - **(b)** Attaching a root completes the stitch. If the attached vertex $x$ had a parent $x'$, the implementation continues with pointers at $x'$ and $x$. The next climb from $x$ reaches $y$, since $\mathit{wt}(x)=w<w'$ for the new pending weight $w'$. The other pointer climbs in a different tree, so the two descriptions make the same sequence of attachments.
 - **(c)** When a root walk or climb leaves $z$, repeatedly set $p(z)\gets p(p(z))$ while $\mathit{wt}(p(z))\le\mathit{wt}(z)$. Each shortcut slides the edge from $z$ along a parent edge of at most its weight and replaces its parent by a higher vertex in the same tree. The climb with pending weight $w$ stopped at $y$ before the attachment, so afterwards $\mathit{wt}(y)>w=\mathit{wt}(x)$. The extra step from $x$ in (b) therefore reaches $y$ directly. [TW transformations](#tw-transformations)
 
@@ -395,7 +395,7 @@ For distinct endpoints we use two properties of the true execution. First, the f
 
 *Walks and climbs.* At a revealed vertex $z$ with a revealed parent $q$, both executions see the same two weights, so both make the same shortcut decision. After a shortcut, the new parents of $z$ are the respective parents of $q$, so they satisfy (ii) or (iii) by the invariant for $q$. In particular, a new simulated parent stays in the component of $q$ and $z$. Once the simulated parent is unrevealed, only the true execution can apply another shortcut at $z$, which can only raise the true parent's priority. After advancing both pointers, they agree inside $\lambda$ or are both unrevealed with the true pointer at least as high. A true pointer outside $\lambda$ can only visit other unrevealed vertices.
 
-*Cut.* When $w<\theta<+\infty$, the true cut identifies $z^*$ by its unique weight $\theta$. If $z^*$ is revealed, (i) gives the same weight in the simulation, and both runs make $z^*$ a root. If it is unrevealed, no simulated weight equals $\theta$, so the revealed fields stay intact.
+*Cut.* When $w<\theta<+\infty$, the true cut identifies $`z^*`$ by its unique weight $\theta$. If $`z^*`$ is revealed, (i) gives the same weight in the simulation, and both runs make $`z^*`$ a root. If it is unrevealed, no simulated weight equals $\theta$, so the revealed fields stay intact.
 
 *Stitch.* Every stitch starts in distinct trees, either because the roots differed in (a) or because of the cut. When $x$ is attached below $y$, its old parent, if present, stays in the other tree. Thus each pending edge again joins distinct trees. By (b) and (c), the extra step from $x$ to $y$ preserves the fields and the order of attachments. The attachment argument of [Lemma 5](#lem-simulation) applies to the current fields. By (i), both runs make the same climb decision at a revealed vertex. After advancing, the pointers coincide inside $\lambda$ or are both outside it with the true pointer at least as high. Hence every attachment preserves (i)–(iii).
 
@@ -415,7 +415,7 @@ There exists an insertion sequence of length $n-1$, depending on $\pi$, after wh
 
 **Proof.**
 
-Let $\ell_1,\dots,\ell_n$ be the vertices in increasing priority order. Insert $(\ell_i,\ell_{i+1})$ for $i=1,\dots,n-1$ with distinct weights. At step $i$, $\ell_i$ is the root of the component $\{\ell_1,\dots,\ell_i\}$ and $\ell_{i+1}$ is an isolated root. Both algorithms attach $\ell_i$ directly below $\ell_{i+1}$. No other parent changes. In the resulting path, a query or further insertion between $\ell_1$ and $\ell_n$ takes $\Theta(n)$ time. $\square$
+Let $\ell_1,\dots,\ell_n$ be the vertices in increasing priority order. Insert $(\ell_i,\ell_{i+1})$ for $i=1,\dots,n-1$ with distinct weights. At step $i$, $\ell_i$ is the root of the component $`\{\ell_1,\dots,\ell_i\}`$ and $\ell_{i+1}$ is an isolated root. Both algorithms attach $\ell_i$ directly below $\ell_{i+1}$. No other parent changes. In the resulting path, a query or further insertion between $\ell_1$ and $\ell_n$ takes $\Theta(n)$ time. $\square$
 
 Here the adversary uses $\pi$ to choose the edges. In contrast, if the $n-1$ edges of a path are chosen independently of $\pi$ and inserted in any fixed order, then by [Theorem 1](#thm-oec-exact) every vertex has expected depth $H_n-1$ after the last insertion.
 
@@ -423,7 +423,7 @@ Here the adversary uses $\pi$ to choose the edges. In contrast, if the $n-1$ edg
 
 <a name="sec-hb"></a>
 
-The strict AM-tree of Section 3 of the paper bounds the subtree size of every child relative to its parent. The Rival-tree balances the heights of the children, as in an AVL tree. A tall child needs a rival of almost the same height. It guarantees height at most $\log_\varphi(n+1)<1.441\log_2(n+1)$, where $\varphi=(1+\sqrt5)/2$. With either link, a path-max query takes $O(\log n)$ worst-case time. With array-indexed child lists, an insertion takes $O(\log n)$ amortized and $O(\log^2 n)$ worst-case time. The stitch analysis assumes distinct weights.
+The strict AM-tree bounds the subtree size of every child relative to its parent. The Rival-tree balances the heights of the children, as in an AVL tree. A tall child needs a rival of almost the same height. It guarantees height at most $\log_\varphi(n+1)<1.441\log_2(n+1)$, where $\varphi=(1+\sqrt5)/2$. With either link, a path-max query takes $O(\log n)$ worst-case time. With array-indexed child lists, an insertion takes $O(\log n)$ amortized and $O(\log^2 n)$ worst-case time. The stitch analysis assumes distinct weights.
 
 ### Algorithms
 
@@ -440,7 +440,7 @@ Only $x$, $y$, and the old parent of $y$ can change their children. $\mathrm{Per
 
 <a name="alg-perch"></a>
 
-**Algorithm 1. The perch-based link.**
+**Algorithm R1. The perch-based link.**
 
 ```
 Perch(x):
@@ -456,7 +456,7 @@ PerchLink(u, v, w):
 
 <a name="alg-stitch"></a>
 
-**Algorithm 2. The stitch-based link (distinct weights).**
+**Algorithm R2. The stitch-based link (distinct weights).**
 
 ```
 Stitch(u, v, w):
@@ -473,7 +473,7 @@ Stitch(u, v, w):
 
 <a name="alg-hb"></a>
 
-**Algorithm 3. The Rival-tree.**
+**Algorithm R3. The Rival-tree.**
 
 ```
 Insert(u, v, w):
@@ -506,7 +506,7 @@ A path-max query on $u$ and $v$ walks from $u$ and $v$ to their lowest common an
 
 For a vertex $y$, let $c_1(y)\ge c_2(y)$ be the largest and the second largest height of a child of $y$, where a missing value is $-1$; thus $h(y)=c_1(y)+1$.
 
-**Definition 1.**
+**Definition R1.**
 
 <a name="def-hb"></a>
 
@@ -514,13 +514,13 @@ A vertex $y$ is *balanced* if $c_1(y)\le 1$ or $c_2(y)\ge c_1(y)-1$. Otherwise $
 
 In other words, a vertex of height $k\ge3$ is balanced if it has a child of height $k-1$ and another child, a *rival*, of height at least $k-2$; we call this condition the *rival rule*. Whether $y$ is balanced, and its height, depend only on the multiset of the heights of its children. The following observation is immediate.
 
-**Fact 1.**
+**Fact R1.**
 
 <a name="fact-hb-extra"></a>
 
-Let $O$ be a nonempty set of children of $y$ whose heights, as a multiset, satisfy the condition of [Definition 1](#def-hb), and let $k$ be the largest height in $O$. If every other child of $y$ has height at most $k$, then $y$ is balanced and $h(y)=k+1$.
+Let $O$ be a nonempty set of children of $y$ whose heights, as a multiset, satisfy the condition of [Definition R1](#def-hb), and let $k$ be the largest height in $O$. If every other child of $y$ has height at most $k$, then $y$ is balanced and $h(y)=k+1$.
 
-**Lemma 1.**
+**Lemma R1.**
 
 <a name="lem-hb-height"></a>
 
@@ -536,7 +536,7 @@ Let $S(k)$ be the minimum number of vertices of a balanced tree of height $k$. C
 
 <a name="rival-layout"></a>
 
-Every vertex $v$ stores $p(v)$, $\mathit{wt}(v)$, $h(v)$, and a doubly linked list for each stored child height. A bit mask identifies the nonempty lists. When a child changes parents, move its list entry from the old parent to the new one, using its current stored height. Roots have no such entry. When only a child's stored height changes, `UpdateHeight` moves its entry between lists of the same parent. Each list operation updates the corresponding bit when the list gains its first child or loses its last. [Algorithm 3](#alg-hb)
+Every vertex $v$ stores $p(v)$, $\mathit{wt}(v)$, $h(v)$, and a doubly linked list for each stored child height. A bit mask identifies the nonempty lists. When a child changes parents, move its list entry from the old parent to the new one, using its current stored height. Roots have no such entry. When only a child's stored height changes, `UpdateHeight` moves its entry between lists of the same parent. Each list operation updates the corresponding bit when the list gains its first child or loses its last. [Algorithm R3](#alg-hb)
 
 All heights are $O(\log n)$, so each mask fits in $O(1)$ machine words. With an array of list heads per vertex, finding a tallest child, computing the height, testing balance, and adding or removing a child each take $O(1)$ worst-case time. This layout uses $O(n\log n)$ space and gives the insertion time bounds in the two theorems below.
 
@@ -544,12 +544,12 @@ There are at most $n-1$ nonempty (parent, height) lists, so storing their heads 
 
 **The rebalancing procedure.**
 
-The procedure $\mathrm{Fix}(y)$ in [Algorithm 3](#alg-hb) promotes the heavy child of $y$ as long as $y$ is unbalanced, and $\mathrm{Rebalance}(P)$ calls $\mathrm{Fix}$ on every vertex of a set $P$, from the bottom up. In the analysis we use the potential
+The procedure $\mathrm{Fix}(y)$ in [Algorithm R3](#alg-hb) promotes the heavy child of $y$ as long as $y$ is unbalanced, and $\mathrm{Rebalance}(P)$ calls $\mathrm{Fix}$ on every vertex of a set $P$, from the bottom up. In the analysis we use the potential
 ```math
 \Psi=\sum_{v\in V}h(v).
 ```
 
-**Lemma 2.**
+**Lemma R2.**
 
 <a name="lem-hb-fix"></a>
 
@@ -557,7 +557,7 @@ Let $y$ be a vertex whose proper descendants are all balanced, and let $z=p(y)$ 
 
 - **(i)** Every promotion in [the promotion step of Fix](#alg-hb) decreases $h(y)$ by at least $2$ and does not increase the height of any vertex; hence it decreases $\Psi$ by at least $2$, and $\mathrm{Fix}(y)$ performs at most $h(y)/2$ promotions.
 
-- **(ii)** After the call, $y$ and all vertices that were descendants of $y$ before the call are balanced.
+- **(ii)** After the call, $y$ and all its original proper descendants are balanced. Throughout the call, only $y$ and its ancestors at entry can change height.
 
 - **(iii)** The call does not change the parent of any vertex that was not a descendant of $y$, and among these vertices, only $z$ may change its set of children.
 
@@ -565,11 +565,11 @@ Let $y$ be a vertex whose proper descendants are all balanced, and let $z=p(y)$ 
 
 Let $R$ be the children of $y$ promoted by rotation so far. The current parent $q$ of $y$ is either its original parent $z$ or a vertex in $R$. Maintain that every proper descendant of $y$ is balanced and each $r\in R$ keeps its original children and height. Its additional children have height below $h(r)$.
 
-In one iteration the heavy child $c$ has height $k\ge2$, so $h(y)=k+1$ and all other children have height at most $k-2$. Removing $c$ drops $h(y)$ to at most $k-1$. A shortcut leaves the subtree of $c$ intact. A rotation also gives $c$ the child $y$ of height at most $k-1$, so its original children still witness its height and balance by [Fact 1](#fact-hb-extra).
+In one iteration the heavy child $c$ has height $k\ge2$, so $h(y)=k+1$ and all other children have height at most $k-2$. Removing $c$ drops $h(y)$ to at most $k-1$. A shortcut leaves the subtree of $c$ intact. A rotation also gives $c$ the child $y$ of height at most $k-1$, so its original children still witness its height and balance by [Fact R1](#fact-hb-extra).
 
-The parent $q$, if present, replaces a child of height $k+1$ by children of height at most $k$. When $q\in R$, those children are all shorter than $q$ and its original children still witness balance. When $q=z$, the maximum child height can only decrease, so the same is true of $h(z)$ and the heights of its ancestors. This establishes (i) and preserves the invariant until $y$ is balanced, giving (ii). Only $y$ and the promoted children change parents. The changed child sets belong to those vertices and $z$, giving (iii). $\square$
+The parent $q$, if present, replaces a child of height $k+1$ by children of height at most $k$. When $q\in R$, its original children still witness its height and balance. When $q=z$, its maximum child height can only decrease, and a decrease can propagate only to its ancestors. Among the original proper descendants of $y$, a child promoted by rotation keeps its height by the invariant, and every other vertex keeps its subtree. This proves (i) and the height claim in (ii). At termination $y$ is balanced, and the invariant gives balance for its original proper descendants, proving (ii). Only $y$ and the promoted children change parents. The changed child sets belong to those vertices and $z$, giving (iii). $\square$
 
-**Lemma 3.**
+**Lemma R3.**
 
 <a name="lem-hb-rebalance"></a>
 
@@ -579,13 +579,13 @@ Suppose that $P$ is closed under taking parents (the parent of every vertex of $
 
 The root paths of unprocessed vertices in $P$ stay as they were just after the link. Indeed, a fix at $y$ changes parents only in its subtree. If a remaining vertex's root path entered that subtree, it would have been deeper than $y$ after the link and processed earlier.
 
-When $y$ is reached, its proper descendants are therefore outside $P$ or already processed. Inductively they are balanced and have correct stored heights. Recomputing $h(y)$ and applying [Lemma 2](#lem-hb-fix) fixes $y$ and preserves those descendants' heights and balance. The only vertices above the original subtree whose heights or balance can change lie on the original ancestor path of $y$. They belong to $P$ and are still unprocessed. This proves the invariant and the result. $\square$
+When $y$ is reached, its proper descendants are therefore outside $P$ or already processed. Inductively they are balanced and have correct stored heights. Recomputing $h(y)$ and applying [Lemma R2](#lem-hb-fix) fixes $y$ and preserves those descendants' heights and balance. The only vertices above the original subtree whose heights or balance can change lie on the original ancestor path of $y$. They belong to $P$ and are still unprocessed. This proves the invariant and the result. $\square$
 
 ### Insertion with the perch-based link
 
 The next lemma bounds the effect of a perch on the heights.
 
-**Lemma 4.**
+**Lemma R4.**
 
 <a name="lem-hb-perch"></a>
 
@@ -595,7 +595,7 @@ Suppose that $\mathrm{Perch}(x)$ promotes $x$ itself until it becomes a root. Le
 
 A promotion of $x$ with parent $y$ changes only the parents of $x$ and, in the case of a rotation, of $y$. Hence $p(a_{i})=a_{i+1}$ until the $i$-th promotion, which therefore promotes $x$ over $a_i$, and after it $a_i$ never changes again. Let $a_0=x$. Right before the $i$-th promotion, the children of $a_i$ are its original children, except that $a_{i-1}$ is replaced by $x$ if the $(i-1)$-th promotion was a rotation, and $x$ is added if it was a shortcut (for $i=1$, the child $a_0=x$ is simply present). The $i$-th promotion removes $x$ from the children of $a_i$. So the final children of $a_i$ are its original children other than $a_{i-1}$, together with $a_{i-1}$ if $i\ge2$ and the $(i-1)$-th promotion was a shortcut. By induction on $i$, the final height of $a_{i-1}$ is at most its original height, and hence so is the final height of $a_i$. The final children of $x$ are its original children and the vertices $a_i$ over which $x$ was rotated, all of which have height at most $`h^*`$; so $`h(x)\le h^*+1`$. Every other vertex keeps its children, and its subtree contains neither $x$ nor any $a_i$, so its subtree does not change. $\square$
 
-**Theorem 1.**
+**Theorem R1.**
 
 <a name="thm-hb-perch"></a>
 
@@ -605,35 +605,35 @@ Consider the Rival-tree with the perch-based link, starting from $n$ isolated ve
 
 All promotions preserve path-max values. If $u$ and $v$ were connected, the last promotion of $v$ rotates it over the root $u$, so $u$ is now its child. The link keeps the lighter of the two parallel edges between them. If they were disconnected, it joins the two perched roots by the new edge. [TW transformations](#tw-transformations)
 
-Initially $P$ is closed under taking parents. Promoting $x\in P$ changes only children sets and parent pointers involving $x$, its parent, and its grandparent, which are in $P$ or null. The final attachment also stays within $P$. Thus subtrees outside $P$ retain their original balance and heights until the fix pass, and [Lemma 3](#lem-hb-rebalance) restores balance everywhere.
+Initially $P$ is closed under taking parents. Promoting $x\in P$ changes only children sets and parent pointers involving $x$, its parent, and its grandparent, which are in $P$ or null. The final attachment also stays within $P$. Thus subtrees outside $P$ retain their original balance and heights until the fix pass, and [Lemma R3](#lem-hb-rebalance) restores balance everywhere.
 
-Let $L=\log_\varphi(n+1)$. Both old root paths have length at most $L$ by [Lemma 1](#lem-hb-height), so $|P|\le2L+2$. $\mathrm{Perch}(u)$ takes at most $L$ promotions and increases the tree height to at most $L+1$ by [Lemma 4](#lem-hb-perch). The second perch takes at most $L+1$ promotions. After both perches and the final attachment, all heights are $O(L)$. Compute post-link depths by memoization and bucket-sort $P$ in $O(|P|)$ time. Each fix takes $O(L)$ promotions by [Lemma 2](#lem-hb-fix), giving the $O(L^2)$ worst-case insertion bound.
+Let $L=\log_\varphi(n+1)$. Both old root paths have length at most $L$ by [Lemma R1](#lem-hb-height), so $|P|\le2L+2$. $\mathrm{Perch}(u)$ takes at most $L$ promotions and increases the tree height to at most $L+1$ by [Lemma R4](#lem-hb-perch). The second perch takes at most $L+1$ promotions. After both perches and the final attachment, all heights are $O(L)$. Compute post-link depths by memoization and bucket-sort $P$ in $O(|P|)$ time. Each fix takes $O(L)$ promotions by [Lemma R2](#lem-hb-fix), giving the $O(L^2)$ worst-case insertion bound.
 
-By [Lemma 4](#lem-hb-perch), each perch contributes $O(L)$ to $\Psi$ through its endpoint, and the final attachment can increase only the new parent's height. Thus the link takes $O(L)$ time and adds $O(L)$ potential. Each promotion in a fix decreases $\Psi$ by at least two, and the other rebalancing work takes $O(|P|)$. Scaling the nonnegative potential, which starts at zero, gives $O(L)$ amortized insertion time. $\square$
+By [Lemma R4](#lem-hb-perch), each perch contributes $O(L)$ to $\Psi$ through its endpoint, and the final attachment can increase only the new parent's height. Thus the link takes $O(L)$ time and adds $O(L)$ potential. Each promotion in a fix decreases $\Psi$ by at least two, and the other rebalancing work takes $O(|P|)$. Scaling the nonnegative potential, which starts at zero, gives $O(L)$ amortized insertion time. $\square$
 
 ### Insertion with the stitch-based link
 
-Use the smaller pre-link height at the selection step of [Algorithm 2](#alg-stitch), breaking ties arbitrarily. At the start of a call, suppose both pointers still have their original root paths. If one is an ancestor of the other, it was also an ancestor before the link and has greater stored height. The rule therefore chooses the descendant, which establishes the induction step in the shared proof. [Stitch correctness](#stitch-correctness)
+Use the smaller pre-link height at the selection step of [Algorithm R2](#alg-stitch), breaking ties arbitrarily. At the start of a call, suppose both pointers still have their original root paths. If one is an ancestor of the other, it was also an ancestor before the link and has greater stored height. The rule therefore chooses the descendant, which establishes the induction step in the shared proof. [Stitch correctness](#stitch-correctness)
 
 A stitch can increase many heights, so we analyze the link and fixes together. Write $r(v)$ for the height before insertion, $T'$ for the forest right after the link, and $T'[y]$ for the subtree of $y$ in $T'$. A vertex $y\in P$ is *processed* when `Rebalance` recomputes its height just before $\mathrm{Fix}(y)$.
 
-**Lemma 5.**
+**Lemma R5.**
 
 <a name="lem-hb-stitch-height"></a>
 
-In an insertion with the stitch-based link, every vertex $y\in P$ satisfies $h(y)\le r(y)+7$ when it is processed.
+Consider a stitch-based insertion with distinct edge weights. Suppose the forest is balanced and all stored heights are correct immediately before the insertion. Then every vertex $y\in P$ satisfies $h(y)\le r(y)+7$ when `Rebalance` processes it.
 
 **Proof.**
 
-We first collect four properties of the insertion.
+The two original root paths form a parent-closed set $P$. Every parent pointer changed by the link joins two vertices of $P$, so $P$ stays parent-closed and vertices outside $P$ keep their subtrees. These vertices enter `Rebalance` balanced and with correct stored heights. The bottom-up invariant in the proof of [Lemma R3](#lem-hb-rebalance) therefore applies.
 
 - **(a)** Every edge of $T'$ satisfies $r(\text{child})\le r(\text{parent})$: an edge of the forest before the insertion joins a vertex to a taller parent, and an attached vertex is the endpoint of smaller stored height, which is its height before the insertion. Since heights strictly increase along every root path before the insertion, every value of $r$ occurs at most twice in $P$.
 
-- **(b)** A vertex outside $P$ keeps its height and changes its parent only when promoted by $\mathrm{Fix}$ at that parent. The link leaves its subtree intact. In a fix it can only be a proper descendant of the fixed vertex, in which case its height stays the same, or be outside the fix altogether. The original ancestors of every fixed vertex lie in $P$ by the root-path invariant of [Lemma 3](#lem-hb-rebalance).
+- **(b)** A vertex outside $P$ keeps its height and changes its parent only when promoted by $\mathrm{Fix}$ at that parent. A fix changes parent pointers only at the fixed vertex and the children it promotes. By [Lemma R2](#lem-hb-fix)(ii), heights can change only at the fixed vertex and its ancestors at entry. All these vertices lie in $P$ by the root-path invariant in the proof of [Lemma R3](#lem-hb-rebalance).
 
 - **(c)** When $y$ is processed, its subtree has the same vertex set as in $T'$. A fix can change subtree membership only at the vertex it fixes and that vertex's proper descendants. By the bottom-up invariant, no earlier fix was at an ancestor of $y$.
 
-- **(d)** Let $a\in P$, and let $C_a$ be the set of children of $a$ before the insertion that lie outside $P$ and are promoted in the call $\mathrm{Fix}(a)$. Then $\sum_{c\in C_a}\varphi^{h(c)}\le\varphi^{r(a)}$. Indeed, every promotion in $\mathrm{Fix}(a)$ promotes a child of height $h(a)-1$ and then decreases $h(a)$ by at least $2$ ([Lemma 2](#lem-hb-fix)(i)), so the heights of the promoted children differ pairwise by at least $2$. By (b), every $c\in C_a$ has height $r(c)\le r(a)-1$, so the sum is at most $\varphi^{r(a)-1}\sum_{j\ge0}\varphi^{-2j}=\varphi^{r(a)-1}/(1-\varphi^{-2})=\varphi^{r(a)}$.
+- **(d)** Let $a\in P$, and let $C_a$ be the set of children of $a$ before the insertion that lie outside $P$ and are promoted in the call $\mathrm{Fix}(a)$. Then $\sum_{c\in C_a}\varphi^{h(c)}\le\varphi^{r(a)}$. Indeed, every promotion in $\mathrm{Fix}(a)$ promotes a child of height $h(a)-1$ and then decreases $h(a)$ by at least $2$ ([Lemma R2](#lem-hb-fix)(i)), so the heights of the promoted children differ pairwise by at least $2$. By (b), every $c\in C_a$ has height $r(c)\le r(a)-1$, so the sum is at most $\varphi^{r(a)-1}\sum_{j\ge0}\varphi^{-2j}=\varphi^{r(a)-1}/(1-\varphi^{-2})=\varphi^{r(a)}$.
 
 Let $A=P\cap V(T'[y])$ and $W=\sum_{a\in A}\varphi^{r(a)}$. By (a), every $a\in A$ satisfies $r(a)\le r(y)$, and every value occurs at most twice, so
 ```math
@@ -641,7 +641,7 @@ W\le 2\sum_{j=0}^{r(y)}\varphi^j<2\varphi^{r(y)+2},
 ```
 using $\sum_{j=0}^{k}\varphi^j=(\varphi^{k+1}-1)/(\varphi-1)<\varphi^{k+2}$.
 
-If $y$ has no children, then $h(y)=0$. Otherwise, let $c_0$ be a tallest child of $y$ and $H=h(c_0)$, so $h(y)=H+1$. When $y$ is processed, all its proper descendants are balanced (proof of [Lemma 3](#lem-hb-rebalance)). We build a *witness* tree $Q$ rooted at $c_0$: a vertex $x$ of $Q$ is *expanded* if $x\in P$ and $h(x)\ge3$, and then its two tallest children are its children in $Q$; otherwise $x$ is a leaf of $Q$. An expanded vertex $x$ of height $k\ge3$ is balanced, so its two tallest children have heights $k-1$ and at least $k-2$, and $\varphi^{k}=\varphi^{k-1}+\varphi^{k-2}$ is at most the sum of $\varphi^{h}$ over these two children. By induction over $Q$,
+If $y$ has no children, then $h(y)=0$. Otherwise, let $c_0$ be a tallest child of $y$ and $H=h(c_0)$, so $h(y)=H+1$. When $y$ is processed, all its proper descendants are balanced (proof of [Lemma R3](#lem-hb-rebalance)). We build a *witness* tree $Q$ rooted at $c_0$: a vertex $x$ of $Q$ is *expanded* if $x\in P$ and $h(x)\ge3$, and then its two tallest children are its children in $Q$; otherwise $x$ is a leaf of $Q$. An expanded vertex $x$ of height $k\ge3$ is balanced, so its two tallest children have heights $k-1$ and at least $k-2$, and $\varphi^{k}=\varphi^{k-1}+\varphi^{k-2}$ is at most the sum of $\varphi^{h}$ over these two children. By induction over $Q$,
 ```math
 \varphi^H\le\sum_{\text{leaves }x\text{ of }Q}\varphi^{h(x)}.
 ```
@@ -661,25 +661,25 @@ because $\varphi^4>6$. Hence $H\le r(y)+6$ and $h(y)\le r(y)+7$. $\square$
 
 The bound holds only when $y$ is processed: right after the link, before the descendants of $y$ are fixed, the height of $y$ can be much larger.
 
-**Theorem 2.**
+**Theorem R2.**
 
 <a name="thm-hb-stitch"></a>
 
-With the stitch-based link and distinct weights, the forest is a balanced T-MST after every insertion, so its height is at most $\log_\varphi(n+1)$, and every path-max query takes $O(\log n)$ worst-case time. With the array of list heads, every insertion takes $O(\log n)$ amortized time and $O(\log^2 n)$ worst-case time. [Data layout](#rival-layout)
+Consider the Rival-tree with the stitch-based link, starting from $n$ isolated vertices and inserting edges of distinct weights. After every insertion, the forest is a balanced T-MST, so its height is at most $\log_\varphi(n+1)$, and every path-max query takes $O(\log n)$ worst-case time. With the array of list heads, every insertion takes $O(\log n)$ amortized time and $O(\log^2 n)$ worst-case time. [Data layout](#rival-layout)
 
 **Proof.**
 
-The stitch advances along the original paths in $O(|P|)$ time. It changes only parent and children sets in $P$, keeps $P$ closed under taking parents, and preserves path-max values. The post-link paths have at most $|P|$ vertices in $P$ and $O(L)$ vertices outside it. Thus the balance and worst-case time arguments of [Theorem 1](#thm-hb-perch) apply.
+The isolated vertices start balanced with correct stored heights. Assume these properties before an insertion and let $L=\log_\varphi(n+1)$. The stitch advances along the original paths in $O(|P|)$ time. It changes only parent pointers and child sets in $P$, keeps $P$ closed under taking parents, and preserves path-max values. By [Lemma R3](#lem-hb-rebalance), rebalancing restores the induction hypotheses. The post-link paths have at most $|P|$ vertices in $P$ and $O(L)$ vertices outside it, so the worst-case time argument of [Theorem R1](#thm-hb-perch) applies.
 
-For the amortized time, let $k_y$ be the number of promotions in $\mathrm{Fix}(y)$ for $y\in P$, and $K=\sum_{y\in P}k_y$. By [Lemma 5](#lem-hb-stitch-height) and [Lemma 2](#lem-hb-fix)(i), $h(y)\le r(y)+7-2k_y$ after the call $\mathrm{Fix}(y)$. The height of $y$ does not change afterwards: by the proof of [Lemma 3](#lem-hb-rebalance), a later call $\mathrm{Fix}(a)$ changes, among the descendants of $a$, only the height of $a$, and otherwise only the heights of ancestors of $a$, which are unprocessed. Vertices outside $P$ keep their heights ([Lemma 5](#lem-hb-stitch-height), property (b) in its proof). Hence the insertion changes $\Psi$ by
+For the amortized time, let $k_y$ be the number of promotions in $\mathrm{Fix}(y)$ for $y\in P$, and $K=\sum_{y\in P}k_y$. By [Lemma R5](#lem-hb-stitch-height) and [Lemma R2](#lem-hb-fix)(i), $h(y)\le r(y)+7-2k_y$ after the call $\mathrm{Fix}(y)$. A later call $\mathrm{Fix}(a)$ can change heights only at $a$ and its ancestors at the start of that call ([Lemma R2](#lem-hb-fix)(ii)). Those ancestors are still unprocessed by the bottom-up invariant in the proof of [Lemma R3](#lem-hb-rebalance). Thus $y$ keeps its height for the rest of the insertion. Vertices outside $P$ also keep their heights by property (b) in the proof of [Lemma R5](#lem-hb-stitch-height). Hence the insertion changes $\Psi$ by
 ```math
 \Delta\Psi=\sum_{y\in P}\bigl(h(y)-r(y)\bigr)\le 7|P|-2K,
 ```
 where $h(y)$ is the height after the insertion. The insertion takes $O(|P|+K)$ time: the link takes $O(L)$ time, the depths and the order of `Rebalance` take $O(|P|)$ time, and $\mathrm{Fix}(y)$ takes $O(1+k_y)$ time. With the potential $c\Psi$ for a suitable constant $c$, the amortized time is $O(|P|)=O(L)$, since $|P|\le2L+2$. Since $\Psi\ge0$ and $\Psi=0$ initially, every insertion takes $O(\log n)$ amortized time. $\square$
 
-The $O(\log^2 n)$ worst-case bound of [Theorem 2](#thm-hb-stitch) is tight for a single insertion.
+The $O(\log^2 n)$ worst-case bound of [Theorem R2](#thm-hb-stitch) is tight for a single insertion.
 
-**Proposition 1.**
+**Proposition R1.**
 
 <a name="prop-hb-staircase"></a>
 
@@ -691,7 +691,7 @@ For $k\ge0$, let $B_k$ be the balanced tree of height $k$ defined by $B_0$ being
 
 Fix $\ell\ge2$ and let $h_i=\ell+i$ for $i=0,\dots,\ell$. The first tree has a path $x_0,x_1,\dots,x_\ell$, where $x_\ell$ is the root and $p(x_{i-1})=x_i$. The vertex $x_0$ has two further subtrees $B_{\ell-1}$ and $B_{\ell-2}$, so $h(x_0)=h_0$. For $i\ge1$, the vertex $x_i$ has, besides $x_{i-1}$, children that are roots of copies of $B_{h_i-2},B_{h_i-4},\dots$, down to height $0$ or $1$; we call them the *stairs* of $x_i$. By induction, $h(x_i)=h_i$, and $x_i$ is balanced, since it has children of heights $h_i-1$ and $h_i-2$. The weights increase along the path, $\mathit{wt}(x_0)<\mathit{wt}(x_1)<\dots<\mathit{wt}(x_{\ell-1})$, and all other weights are arbitrary and distinct. The second tree is a copy of $B_{2\ell+1}$ with root $b$. The forest has $n=O(\varphi^{2\ell})$ vertices, so $\ell=\Omega(\log n)$.
 
-Insert an edge $(x_0,b,w)$ with $w<\mathit{wt}(x_0)$. In every call of [Algorithm 2](#alg-stitch), one endpoint is $b$, which is a root, and the other is some $x_i$, with pending weight $w$ or $\mathit{wt}(x_{i-1})$, which is smaller than $\mathit{wt}(x_i)$. So no endpoint climbs, and since $h(x_i)\le 2\ell<h(b)$, the vertex $x_i$ is attached below $b$, and the next call has the endpoints $x_{i+1}$ and $b$. This repeats until the root $x_\ell$ is attached below $b$. Now every $x_i$ with $i\ge1$ has lost its child $x_{i-1}$ and has only its stairs as children, whose heights differ by $2$. As long as its tallest remaining stair has height at least $2$, the vertex $x_i$ is unbalanced and $\mathrm{Fix}(x_i)$ promotes that stair, which removes it from the children of $x_i$ by either kind of promotion. Since the stairs are not affected by the processing of other vertices, $\mathrm{Fix}(x_i)$ performs one promotion for each stair of height at least $2$, that is, $\lfloor h_i/2\rfloor-1$ promotions. In total, the insertion performs $\sum_{i=1}^{\ell}(\lfloor h_i/2\rfloor-1)=\Omega(\ell^2)=\Omega(\log^2 n)$ promotions. $\square$
+Insert an edge $(x_0,b,w)$ with $w<\mathit{wt}(x_0)$. In every call of [Algorithm R2](#alg-stitch), one endpoint is $b$, which is a root, and the other is some $x_i$, with pending weight $w$ or $\mathit{wt}(x_{i-1})$, which is smaller than $\mathit{wt}(x_i)$. So no endpoint climbs, and since $h(x_i)\le 2\ell<h(b)$, the vertex $x_i$ is attached below $b$, and the next call has the endpoints $x_{i+1}$ and $b$. This repeats until the root $x_\ell$ is attached below $b$. Now every $x_i$ with $i\ge1$ has lost its child $x_{i-1}$ and has only its stairs as children, whose heights differ by $2$. As long as its tallest remaining stair has height at least $2$, the vertex $x_i$ is unbalanced and $\mathrm{Fix}(x_i)$ promotes that stair, which removes it from the children of $x_i$ by either kind of promotion. Since the stairs are not affected by the processing of other vertices, $\mathrm{Fix}(x_i)$ performs one promotion for each stair of height at least $2$, that is, $\lfloor h_i/2\rfloor-1$ promotions. In total, the insertion performs $\sum_{i=1}^{\ell}(\lfloor h_i/2\rfloor-1)=\Omega(\ell^2)=\Omega(\log^2 n)$ promotions. $\square$
 
 The two starting trees are reachable from singletons under the implementation's tie rule. Insert their edges by increasing depth of the new child, using strictly decreasing weights. Each partial tree contains every level above the deepest one entered, so the two final tallest children retain heights within one of the current maximum wherever the rival rule applies. The new vertex is a leaf, and with the new vertex first the stitch chooses it even on a height tie. The new weight is lighter than the old parent edges, so the new leaf attaches to its intended parent.
 
@@ -707,7 +707,9 @@ Donald E. Knuth (1997). *The Art of Computer Programming, Volume 1: Fundamental 
 
 <a name="ref-notamir2024wdsu"></a>
 
-not_amir (2024). *Maintaining MST with Online Edge Insertions — No LCT Needed*. Codeforces blog entry `130107`.
+not_amir (June 3, 2024). *Maintaining mst with online edge insertions — no LCT needed*. [Codeforces blog entry 130107][weighted-dsu-post]
+
+[weighted-dsu-post]: https://codeforces.com/blog/entry/130107
 
 <a name="ref-song2024oec"></a>
 
